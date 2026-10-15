@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+
+PYTHON="python3"
+if [[ -x ".venv/bin/python" ]]; then
+  PYTHON=".venv/bin/python"
+fi
+
+if [[ $# -lt 1 ]]; then
+  echo "Usage:"
+  echo "  ./run <file-or-name>"
+  echo "  ./run test"
+  echo "  ./run test-show"
+  echo "  ./run analyze <section> [file]"
+  echo "Examples:"
+  echo "  ./run Heaps/PriorityQueue.py"
+  echo "  ./run PriorityQueue"
+  echo "  ./run test"
+  echo "  ./run test-show"
+  echo "  ./run analyze Backtracking"
+  echo "  ./run analyze Backtracking singleWordSearch"
+  echo "  ./run analyze Backtracking multipleWordSearch"
+  echo
+  echo "Available:"
+  find . -name '*.py' -not -path './.venv/*' -not -path './tests/*' -not -path './analysis/*' | sed 's|^\./||'
+  exit 1
+fi
+
+TARGET="$1"
+
+if [[ "$TARGET" == "test" || "$TARGET" == "--test" ]]; then
+  "$PYTHON" -m unittest discover -s tests -p 'test_*.py' -v
+  exit 0
+fi
+
+if [[ "$TARGET" == "test-show" ]]; then
+  "$PYTHON" -c "from tests.test_single_word_search import show_cases; show_cases()"
+  "$PYTHON" -c "from tests.test_multiple_word_search import show_cases; show_cases()"
+  exit 0
+fi
+
+if [[ "$TARGET" == "analyze" ]]; then
+  SECTION="${2:-}"
+  NAME="${3:-}"
+
+  if [[ -z "$SECTION" ]]; then
+    echo "Usage: ./run analyze <section> [file]"
+    echo "Examples:"
+    echo "  ./run analyze Backtracking"
+    echo "  ./run analyze Backtracking singleCharSearch"
+    echo "  ./run analyze Backtracking singleWordSearch"
+    echo "  ./run analyze Backtracking multipleWordSearch"
+    echo
+    echo "Sections:"
+    find analysis -mindepth 1 -maxdepth 1 -type d | sed 's|^analysis/||'
+    exit 1
+  fi
+
+  SECTION_DIR=$(find analysis -mindepth 1 -maxdepth 1 -type d -iname "$SECTION" | head -n 1)
+  if [[ -z "$SECTION_DIR" ]]; then
+    echo "No analysis section: $SECTION"
+    exit 1
+  fi
+
+  if [[ -n "$NAME" ]]; then
+    MATCH=$(find "$SECTION_DIR" -maxdepth 1 -type f -iname "${NAME}.py" | head -n 1)
+    if [[ -z "$MATCH" ]]; then
+      echo "No analysis named $NAME in $SECTION_DIR"
+      echo "Available:"
+      find "$SECTION_DIR" -maxdepth 1 -type f -name '*.py' -exec basename {} .py \;
+      exit 1
+    fi
+    echo "Running $MATCH"
+    "$PYTHON" "$MATCH"
+    exit 0
+  fi
+
+  FILES=$(find "$SECTION_DIR" -maxdepth 1 -type f -name '*.py' | sort)
+  if [[ -z "$FILES" ]]; then
+    echo "No analysis files in $SECTION_DIR"
+    exit 1
+  fi
+  while IFS= read -r file; do
+    echo "Running $file"
+    "$PYTHON" "$file"
+  done <<< "$FILES"
+  exit 0
+fi
+
+if [[ -f "$TARGET" ]]; then
+  "$PYTHON" "$TARGET"
+  exit 0
+fi
+
+EXACT=$(find . -iname "${TARGET}.py" -not -path './.venv/*' -not -path './tests/*' -not -path './analysis/*' | sed 's|^\./||')
+EXACT_COUNT=$(echo "$EXACT" | grep -c . || true)
+if [[ "$EXACT_COUNT" -eq 1 ]]; then
+  echo "Running $EXACT"
+  "$PYTHON" "$EXACT"
+  exit 0
+elif [[ "$EXACT_COUNT" -gt 1 ]]; then
+  echo "Multiple matches:"
+  echo "$EXACT"
+  exit 1
+fi
+
+MATCHES=$(find . -iname "*${TARGET}*.py" -not -path './.venv/*' -not -path './tests/*' -not -path './analysis/*' | sed 's|^\./||')
+COUNT=$(echo "$MATCHES" | grep -c . || true)
+
+if [[ "$COUNT" -eq 0 ]]; then
+  echo "No file matching: $TARGET"
+  exit 1
+elif [[ "$COUNT" -gt 1 ]]; then
+  echo "Multiple matches:"
+  echo "$MATCHES"
+  exit 1
+else
+  echo "Running $MATCHES"
+  "$PYTHON" "$MATCHES"
+fi

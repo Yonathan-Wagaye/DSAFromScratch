@@ -26,6 +26,10 @@ class Trie:
             currentNode = currentNode.children[char]
         currentNode.isWord = True
 
+    def insertFromArray(self, words) -> None:
+        for word in words:
+            self.insert(word)
+
     def search(self, word) -> bool:
         currentNode = self.root
         for char in word:

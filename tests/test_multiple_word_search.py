@@ -1,6 +1,9 @@
 import unittest
 
-from Backtracking.multipleWordSearch import naiveMutipleWordSearch
+from Backtracking.multipleWordSearch import (
+    naiveMutipleWordSearch,
+    optimalMutipleWordSearch,
+)
 
 EXAMPLE_BOARD = [
     ["o", "a", "a", "n"],
@@ -50,12 +53,18 @@ CASES = (
 )
 
 
-def search(grid, words):
+def search(function, grid, words):
     copied = [row.copy() for row in grid]
     try:
-        return naiveMutipleWordSearch(copied, words), copied
-    except RecursionError:
-        return "RecursionError", copied
+        return function(copied, words), copied
+    except Exception as error:
+        return type(error).__name__, copied
+
+
+def found_words(actual):
+    if isinstance(actual, list):
+        return sorted(set(actual))
+    return actual
 
 
 def format_grid(grid):
@@ -66,16 +75,37 @@ def format_grid(grid):
     return "\n".join(" ".join(row) for row in grid)
 
 
-class TestMultipleWordSearch(unittest.TestCase):
+class TestNaiveMultipleWordSearch(unittest.TestCase):
     def test_returns_the_words_that_have_a_valid_path(self):
         for name, grid, words, expected in CASES:
             with self.subTest(name=name, words=words):
-                actual, _grid_after = search(grid, words)
+                actual, _grid_after = search(naiveMutipleWordSearch, grid, words)
                 self.assertEqual(actual, expected)
 
     def test_does_not_modify_the_grid(self):
         original = [row.copy() for row in EXAMPLE_BOARD]
-        _actual, grid_after = search(EXAMPLE_BOARD, ["oath", "pea", "eat", "rain"])
+        _actual, grid_after = search(
+            naiveMutipleWordSearch,
+            EXAMPLE_BOARD,
+            ["oath", "pea", "eat", "rain"],
+        )
+        self.assertEqual(grid_after, original)
+
+
+class TestOptimalMultipleWordSearch(unittest.TestCase):
+    def test_returns_each_found_word_once(self):
+        for name, grid, words, expected in CASES:
+            with self.subTest(name=name, words=words):
+                actual, _grid_after = search(optimalMutipleWordSearch, grid, words)
+                self.assertEqual(found_words(actual), found_words(expected))
+
+    def test_does_not_modify_the_grid(self):
+        original = [row.copy() for row in EXAMPLE_BOARD]
+        _actual, grid_after = search(
+            optimalMutipleWordSearch,
+            EXAMPLE_BOARD,
+            ["oath", "pea", "eat", "rain"],
+        )
         self.assertEqual(grid_after, original)
 
 
@@ -85,14 +115,16 @@ def show_cases():
     print()
 
     for number, (name, grid, words, expected) in enumerate(CASES, start=1):
-        actual, _grid_after = search(grid, words)
-        status = "ok" if actual == expected else "FAIL"
+        naive, _grid_after = search(naiveMutipleWordSearch, grid, words)
+        optimal, _grid_after = search(optimalMutipleWordSearch, grid, words)
+        naive_status = "ok" if naive == expected else "FAIL"
+        optimal_status = "ok" if found_words(optimal) == found_words(expected) else "FAIL"
         print(f"[{number}] {name}")
         print(format_grid(grid))
         print(f"words:    {words}")
         print(f"expected: {expected}")
-        print(f"actual:   {actual}")
-        print(status)
+        print(f"naive:    {naive} ({naive_status})")
+        print(f"optimal:  {optimal} ({optimal_status})")
         print()
 
 

@@ -5,7 +5,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from Backtracking.multipleWordSearch import naiveMutipleWordSearch
+from Backtracking.multipleWordSearch import (
+    naiveMutipleWordSearch,
+    optimalMutipleWordSearch,
+)
+
+FUNCTIONS = (
+    ("naive", naiveMutipleWordSearch),
+    ("optimal", optimalMutipleWordSearch),
+)
 
 
 def blank_grid(rows, cols, fill):
@@ -76,16 +84,26 @@ CASES = (
 CASES[1]["grid"][0][0] = "A"
 
 
-def time_search(grid, words, repeats):
+def time_search(function, grid, words, repeats):
     best = None
     result = None
+    error = None
+
     for _ in range(repeats):
         start = time.perf_counter()
-        result = naiveMutipleWordSearch(grid, words)
+        try:
+            result = function(grid, words)
+            error = None
+        except Exception as caught:
+            result = None
+            error = type(caught).__name__
         elapsed = time.perf_counter() - start
         if best is None or elapsed < best:
             best = elapsed
-    return result, best
+        if error:
+            break
+
+    return result, best, error
 
 
 def format_time(seconds):
@@ -96,26 +114,35 @@ def format_time(seconds):
     return f"{seconds:.2f} s"
 
 
+def format_result(result, elapsed, error):
+    if error:
+        return f"{error}  {format_time(elapsed)}"
+    found = len(result) if isinstance(result, list) else result
+    return f"{found} found  {format_time(elapsed)}"
+
+
 def main():
     print("Multiple word search")
-    print("Function: naiveMutipleWordSearch")
+    print("naive searches each word on its own. optimal walks the board once with a trie.")
     print()
 
-    headers = ("Case", "Grid", "Words", "Found", "Time")
+    headers = ["Case", "Grid", "Words", "naive", "optimal"]
     rows = []
     for case in CASES:
-        result, elapsed = time_search(case["grid"], case["words"], case["repeats"])
-        runs = "1 run" if case["repeats"] == 1 else f"fastest of {case['repeats']}"
-        found = len(result) if isinstance(result, list) else result
-        rows.append(
-            (
-                f"[{case['id']}] {case['name']}",
-                f"{case['rows']} x {case['cols']}",
-                case["detail"],
-                str(found),
-                f"{format_time(elapsed)} ({runs})",
+        row = [
+            f"[{case['id']}] {case['name']}",
+            f"{case['rows']} x {case['cols']}",
+            case["detail"],
+        ]
+        for _name, function in FUNCTIONS:
+            result, elapsed, error = time_search(
+                function,
+                case["grid"],
+                case["words"],
+                case["repeats"],
             )
-        )
+            row.append(format_result(result, elapsed, error))
+        rows.append(tuple(row))
 
     widths = [
         max(len(headers[column]), *(len(row[column]) for row in rows))
